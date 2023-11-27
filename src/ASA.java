@@ -1,7 +1,7 @@
 import java.util.List;
 import java.util.Stack;
 
-public class ASDR implements Parser {
+public class ASA implements Parser {
 
     private int i = 0;
     private boolean hayErrores = false;
@@ -10,7 +10,7 @@ public class ASDR implements Parser {
     private final Stack<Integer> estados;
     private final Stack<Object> pilaValores;
 
-    public ASDR(List<Token> tokens) {
+    public ASA(List<Token> tokens) {
         this.tokens = tokens;
         this.preanalisis = this.tokens.get(i);
         this.estados = new Stack<>();
