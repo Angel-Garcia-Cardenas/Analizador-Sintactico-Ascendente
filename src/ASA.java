@@ -1,365 +1,269 @@
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
 
 public class ASA implements Parser {
-
     private int i = 0;
     private boolean hayErrores = false;
     private Token preanalisis;
     private final List<Token> tokens;
-    private final Stack<Integer> estados;
-    private final Stack<Object> pilaValores;
+    private Stack<Integer> estados;
+
+
+    private static final Map<String, Integer> NO_TERMINALES_MAPA = new HashMap<>();
+    private static final Map<String, Integer> SIMBOLOS_MAPA = new HashMap<>();
+
+    static {
+        NO_TERMINALES_MAPA.put("Q", 0);
+        NO_TERMINALES_MAPA.put("D", 1);
+        NO_TERMINALES_MAPA.put("P", 2);
+        NO_TERMINALES_MAPA.put("A", 3);
+        NO_TERMINALES_MAPA.put("A1", 4);
+        NO_TERMINALES_MAPA.put("A2", 5);
+        NO_TERMINALES_MAPA.put("T", 6);
+        NO_TERMINALES_MAPA.put("T1", 7);
+        NO_TERMINALES_MAPA.put("T2", 8);
+
+        SIMBOLOS_MAPA.put("SELECT", 0);
+        SIMBOLOS_MAPA.put("select", 0);
+        SIMBOLOS_MAPA.put("id", 1);
+        SIMBOLOS_MAPA.put("from", 2);
+        SIMBOLOS_MAPA.put("distinct", 3);
+        SIMBOLOS_MAPA.put(".", 4);
+        SIMBOLOS_MAPA.put(",", 5);
+        SIMBOLOS_MAPA.put("*", 6);
+        SIMBOLOS_MAPA.put("Epsilon", 7);
+        SIMBOLOS_MAPA.put("$", 8);
+    }
+    private static final int[][] ACCION = {
+
+            // | ESTADO | select | id | from | distinct | . | , | * | Epsilon | $ |
+            {  1, 3,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000},   // Estado 1
+            {  2,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  0},   // Estado 2
+            {  3,  -1000, 10,  -1000, 7,  -1000,  -1000,  -1000,  -1000,  -1000},   // Estado 3
+            {  4,  -1000,  -1000,  -1000,  -1000, 5,  -1000,  -1000,  -1000,  -1000},   // Estado 4
+            {  5,  -1000, 10,  -1000,  -1000,  -1000,  -1000, 11,  -1000,  -1000},   // Estado 5
+            {  6,  -1000,  -1000, 17,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000},   // Estado 6
+            {  7,  -1000, 10,  -1000,  -1000,  -1000, 13,  -1000,  -1000,  -1000},   // Estado 7
+            {  8, -1, -1, -1, -1, -1, -1, -1, -1, -1 },   // Estado 8 (Reduce 1)
+            {  9, -2, -2, -2, -2, -2, -2, -2, -2, -2 },   // Estado 9 (Reduce 2)
+            { 10,  -1000,  -1000,  -1000, 15,  -1000,  -1000, 11,  -1000,  -1000},   // Estado 10
+            { 11, -3, -3, -3, -3, -3, -3, -3, -3, -3 },   // Estado 11 (Reduce 3)
+            { 12, -4, -4, -4, -4, -4, -4, -4, -4, -4 },   // Estado 12 (Reduce 4)
+            { 13, -5, -5, -5, -5, -5, -5, -5, -5, -5 },   // Estado 13 (Reduce 5)
+            { 14, -6, -6, -6, -6, -6, -6, -6, -6, -6 },   // Estado 14 (Reduce 6)
+            { 15, 16,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000},   // Estado 15
+            { 16, -7, -7, -7, -7, -7, -7, -7, -7, -7 },   // Estado 16 (Reduce 7)
+            { 17, 21,  -1000,  -1000,  -1000,  -1000,  -1000, 23,  -1000,  -1000},   // Estado 17
+            { 18,  -1000,  -1000,  -1000,  -1000, 19,  -1000,  -1000,  -1000,  -1000},   // Estado 18
+            { 19,  -1000, 21,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000},   // Estado 19
+            { 20, -8, -8, -8, -8, -8, -8, -8, -8, -8 },   // Estado 20 (Reduce 8)
+            { 21, 24,  -1000,  -1000,  -1000,  -1000,  -1000,  -1000, 23,  -1000},   // Estado 21
+            { 22, -9, -9, -9, -9, -9, -9, -9, -9, -9 },   // Estado 22 (Reduce 9)
+            { 23, -10, -10, -10, -10, -10, -10, -10, -10, -10 },   // Estado 23 (Reduce 10)
+            { 24, -11, -11, -11, -11, -11, -11, -11, -11, -11 }    // Estado 24 (Reduce 11)
+    };
+
+    private static final int[][] IR_A = {
+
+            // | ESTADO | Q | D | T | P | A | A1 | A2 | T1 | T2 |
+            { 1, 2, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 1
+            { 2, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 2
+            { 3, -1000, 6, -1000, 9, 4, 8, -1000, -1000, -1000 },   // Estado 3
+            { 4, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 4
+            { 5, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 5
+            { 6, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 6
+            { 7, -1000, -1000, -1000, -1000, 4, 8, -1000, -1000, -1000 },   // Estado 7
+            { 8, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 8
+            { 9, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 9
+            {10, -1000, -1000, -1000, -1000, -1000, -1000, 14, -1000, -1000 },   // Estado 1-1000
+            {11, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 11
+            {12, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 12
+            {13, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 13
+            {14, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 14
+            {15, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 15
+            {16, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 16
+            {17, -1000, -1000, 18, -1000, -1000, -1000, -1000, 12, -1000 },   // Estado 17
+            {18, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 18
+            {19, -1000, -1000, -1000, -1000, -1000, -1000, -1000, 20, -1000 },   // Estado 19
+            {20, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 2-1000
+            {21, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, 22 },   // Estado 21
+            {22, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 22
+            {23, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 },   // Estado 23
+            {24, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000 }    // Estado 24
+    };
 
     public ASA(List<Token> tokens) {
         this.tokens = tokens;
-        this.preanalisis = this.tokens.get(i);
-        this.estados = new Stack<>();
-        this.pilaValores = new Stack<>();
-        // Agrega el estado inicial a la pila de estados
-        this.estados.push(1);
+        preanalisis = this.tokens.get(i);
+        estados = new Stack<>();
+        estados.push(0);
+
     }
 
     @Override
     public boolean parse() {
-        while (true) {
-            int estadoActual = this.estados.peek();
-            Accion accion = obtenerAccion(estadoActual, preanalisis.tipo);
-            if (accion == null) {
-                // Manejar error
-                System.out.println("Error en el análisis sintáctico");
-                return false;
-            }
+        Stack<String> simbolos = new Stack<>();
+        estados.push(0);
+        simbolos.push("$");
 
-            if (accion.tipo == TipoAccion.Desplazamiento) {
-                // Realiza el desplazamiento y avanza al siguiente token
-                this.estados.push(accion.siguienteEstado);
-                this.pilaValores.push(preanalisis);
-                i++;
-                preanalisis = tokens.get(i);
-            } else if (accion.tipo == TipoAccion.Reduccion) {
-                // Realiza la reducción y actualiza el estado
-                Reduccion reduccion = obtenerReduccion(accion.indiceReduccion);
-                if (reduccion == null) {
-                    // Manejar error
-                    System.out.println("Error en el análisis sintáctico");
-                    return false;
-                }
+        while (!simbolos.isEmpty() && !hayErrores) {
+            int estadoActual = estados.peek();
+            String simboloEntrada = obtenerSimboloEntrada();
+            int accion = ACCION[estadoActual][obtenerIndiceSimbolo(simboloEntrada)];
 
-                // Realiza la reducción y actualiza el estado
-                for (int j = 0; j < reduccion.cantidad; j++) {
-                    this.estados.pop();
-                }
-
-                int nuevoEstado = obtenerIrA(this.estados.peek(), reduccion.noTerminal);
-                this.estados.push(nuevoEstado);
-            } else if (accion.tipo == TipoAccion.Aceptacion) {
-                // La cadena fue aceptada correctamente
-                System.out.println("Consulta correcta");
-                return true;
+            if (accion > 0) {
+                // Desplazamiento
+                simbolos.push(simboloEntrada);
+                estados.push(accion);
+                obtenerSiguienteSimbolo();
+            } else if (accion < 0) {
+                // Reducción
+                reducir(-accion, simbolos);
+            } else if (accion == 0) {
+                // Aceptación
+                System.out.println("Análisis sintáctico exitoso.");
+                break;
+            } else {
+                // Error
+                hayErrores = true;
+                System.out.println("Error en el análisis sintáctico.");
+                break;
             }
         }
-    }
 
-    private Accion obtenerAccion(int estado, TipoToken tipoToken) {
-        switch (estado) {
+        return !hayErrores;
+    }
+    private void reducir(int regla, Stack<String> simbolos) {
+        switch (regla) {
             case 1:
-                if (tipoToken == TipoToken.SELECT) {
-                    return new Accion(TipoAccion.Desplazamiento, 3, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
+                // Regla de reducción A -> A1
+                simbolos.pop(); // Pop A1
+                simbolos.push("A");
+                break;
             case 2:
-                return new Accion(TipoAccion.Aceptacion, 0, 0);
-
+                // Regla de reducción D -> P
+                simbolos.pop(); // Pop P
+                simbolos.push("D");
+                break;
             case 3:
-                if (tipoToken == TipoToken.DISTINCT) {
-                    return new Accion(TipoAccion.Desplazamiento, 7, 0);
-                } else if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 10, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
+                // Regla de reducción A2 -> Epsilon
+                simbolos.push("Epsilon");
+                break;
             case 4:
-                if (tipoToken == TipoToken.COMA) {
-                    return new Accion(TipoAccion.Desplazamiento, 5, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
+                // Regla de reducción T -> T1
+                simbolos.pop(); // Pop T1
+                simbolos.push("T");
+                break;
             case 5:
-                if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 10, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
+                // Regla de reducción P -> *
+                simbolos.pop(); // Pop *
+                simbolos.push("P");
+                break;
             case 6:
-                if (tipoToken == TipoToken.FROM) {
-                    return new Accion(TipoAccion.Desplazamiento, 17, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
+                // Regla de reducción A1 -> id A2
+                simbolos.pop(); // Pop A2
+                simbolos.pop(); // Pop id
+                simbolos.push("A1");
+                break;
             case 7:
-                if (tipoToken == TipoToken.ASTERISCO) {
-                    return new Accion(TipoAccion.Desplazamiento, 13, 0);
-                } else if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 10, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
-            case 10:
-                if (tipoToken == TipoToken.PUNTO) {
-                    return new Accion(TipoAccion.Desplazamiento, 15, 0);
-                }else if (tipoToken == TipoToken.EOF) {
-                    return new Accion(TipoAccion.Desplazamiento, 11, 0);
-                }  else {
-                    // Manejar error
-                    return null;
-                }
-
-            case 15:
-                if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 16, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
-            case 17:
-                if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 21, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
-            case 18:
-                if (tipoToken == TipoToken.COMA) {
-                    return new Accion(TipoAccion.Desplazamiento, 19, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-
-            case 19:
-                if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 21, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-/*
-            case 20:
-                if (tipoToken == TipoToken.ASTERISCO || tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Reduccion, 4, 0);
-                } else {
-                    // Manejar error
-                    return null;
-                }
-*/
-            case 21:
-                if (tipoToken == TipoToken.IDENTIFICADOR) {
-                    return new Accion(TipoAccion.Desplazamiento, 24, 0);
-                }else if (tipoToken == TipoToken.EOF) {
-                    return new Accion(TipoAccion.Desplazamiento, 23, 0);
-                }  else {
-                    // Manejar error
-                    return null;
-                }
-
-            default:
-                // Manejar error
-                return null;
-        }
-    }
-
-
-    private Reduccion obtenerReduccion(int indiceReduccion) {
-        switch (indiceReduccion) {
-         /*   case 1:
-                return new Reduccion(NoTerminal.S_PRIMA, 1);
-
-            case 2:
-                return new Reduccion(NoTerminal.Q, 3);
-
-            case 3:
-                return new Reduccion(NoTerminal.D, 3);
-
-            case 4:
-                return new Reduccion(NoTerminal.P, 1);
-
-            case 5:
-                return new Reduccion(NoTerminal.A, 3);
-
-            case 6:
-                return new Reduccion(NoTerminal.A1, 2);
-
-            case 7:
-                return new Reduccion(NoTerminal.A, 1);
-*/
+                // Regla de reducción A2 -> . id
+                simbolos.pop(); // Pop id
+                simbolos.pop(); // Pop .
+                simbolos.push("A2");
+                break;
             case 8:
-                return new Reduccion(NoTerminal.A1, 1);
-
+                // Regla de reducción T -> T, T1
+                simbolos.pop(); // Pop T1
+                simbolos.pop(); // Pop ,
+                simbolos.push("T");
+                break;
             case 9:
-                return new Reduccion(NoTerminal.D, 1);
-
-      //      case 10:
-        //        return new Reduccion(NoTerminal.A1, 3);
-
+                // Regla de reducción T1 -> id T2
+                simbolos.pop(); // Pop T2
+                simbolos.pop(); // Pop id
+                simbolos.push("T1");
+                break;
+            case 10:
+                // Regla de reducción T2 -> Epsilon
+                simbolos.push("Epsilon");
+                break;
             case 11:
-                return new Reduccion(NoTerminal.A2, 3);
-
-            case 12:
-                return new Reduccion(NoTerminal.A2, 1);
-
-            case 13:
-                return new Reduccion(NoTerminal.T, 1);
-
-            case 14:
-                return new Reduccion(NoTerminal.A1, 1);
-
-//            case 15:
- //               return new Reduccion(NoTerminal.A2, 3);
-
-            case 16:
-                return new Reduccion(NoTerminal.A2, 1);
-/*
-            case 17:
-                return new Reduccion(NoTerminal.Q, 1);
-
-            case 18:
-                return new Reduccion(NoTerminal.T, 2);
-
-            case 19:
-                return new Reduccion(NoTerminal.T1, 3);
-*/
-            case 20:
-                return new Reduccion(NoTerminal.T, 2);
-
-/*            case 21:
-                return new Reduccion(NoTerminal.T1, 1);
-*/
-            case 22:
-                return new Reduccion(NoTerminal.T1, 2);
-
-            case 23:
-                return new Reduccion(NoTerminal.T2, 1);
-
-            case 24:
-                return new Reduccion(NoTerminal.T2, 1);
-
-            default:
-                // Manejar error
-                return null;
+                // Regla de reducción T2 -> id
+                simbolos.pop(); // Pop id
+                simbolos.push("T2");
+                break;
         }
+
+        // Lógica de GOTO
+        int nuevoEstado = IR_A[estados.peek()][obtenerIndiceNoTerminal(regla)];
+        estados.push(nuevoEstado);
     }
 
-    private int obtenerIrA(int estado, NoTerminal noTerminal) {
-        switch (estado) {
+    private int obtenerIndiceNoTerminal(int regla) {
+        String noTerminal = obtenerNoTerminalPorRegla(regla);
+        Integer indice = NO_TERMINALES_MAPA.get(noTerminal);
+
+        if (indice == null) {
+            throw new IllegalArgumentException("No se encontró el índice para el no terminal: " + noTerminal);
+        }
+
+        return indice;
+    }
+
+    private int obtenerIndiceSimbolo(String simbolo) {
+        Integer indice = SIMBOLOS_MAPA.get(simbolo);
+
+        if (indice == null) {
+            throw new IllegalArgumentException("No se encontró el índice para el símbolo: " + simbolo);
+        }
+
+        return indice;
+    }
+
+
+
+    private String obtenerNoTerminalPorRegla(int regla) {
+        switch (regla) {
             case 1:
-                if (noTerminal == NoTerminal.Q) {
-                    return 2;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
+                return "A";
+            case 2:
+                return "D";
             case 3:
-                if (noTerminal == NoTerminal.D) {
-                    return 6;
-                } else if (noTerminal == NoTerminal.P) {
-                    return 9;
-                } else if (noTerminal == NoTerminal.A) {
-                    return 4;
-                } else if (noTerminal == NoTerminal.A1) {
-                    return 8;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
+                return "A2";
+            case 4:
+                return "T";
+            case 5:
+                return "P";
+            case 6:
+                return "A1";
             case 7:
-                if (noTerminal == NoTerminal.A) {
-                    return 4;
-                } else if (noTerminal == NoTerminal.A1) {
-                    return 8;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
-            case 17:
-                if (noTerminal == NoTerminal.T) {
-                    return 18;
-                } else if (noTerminal == NoTerminal.T1) {
-                    return 12;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
-            case 19:
-                if (noTerminal == NoTerminal.T1) {
-                    return 20;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
-            case 21:
-                if (noTerminal == NoTerminal.T2) {
-                    return 22;
-                } else {
-                    // Manejar error
-                    return -1;
-                }
-
+                return "A2";
+            case 8:
+                return "T";
+            case 9:
+                return "T1";
+            case 10:
+                return "T2";
+            case 11:
+                return "T2";
             default:
-                // Manejar error
-                return -1;
+                throw new IllegalArgumentException("Regla no válida");
         }
     }
 
-
-    private enum TipoAccion {
-        Desplazamiento,
-        Reduccion,
-        Aceptacion
-    }
-
-    private static class Accion {
-        TipoAccion tipo;
-        int siguienteEstado;
-        int indiceReduccion;
-
-        Accion(TipoAccion tipo, int siguienteEstado, int indiceReduccion) {
-            this.tipo = tipo;
-            this.siguienteEstado = siguienteEstado;
-            this.indiceReduccion = indiceReduccion;
+    private String obtenerSimboloEntrada() {
+        if (i < tokens.size()) {
+            return tokens.get(i).lexema;
         }
+        return "$";
     }
 
-    private static class Reduccion {
-        NoTerminal noTerminal;
-        int cantidad;
-
-        Reduccion(NoTerminal noTerminal, int cantidad) {
-            this.noTerminal = noTerminal;
-            this.cantidad = cantidad;
+    private void obtenerSiguienteSimbolo() {
+        if (i < tokens.size()) {
+            i++;
+            preanalisis = tokens.get(i);
         }
-    }
-
-    private enum NoTerminal {
-        S_PRIMA, Q, D, P, A, A1, A2, T, T1, T2
     }
 }
