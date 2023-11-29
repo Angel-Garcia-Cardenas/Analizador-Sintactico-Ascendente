@@ -15,7 +15,7 @@ public class Principal {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
 
-        while(!existenErrores){
+        for(;;){
             System.out.print(">>> ");
             String linea = reader.readLine();
             if(linea == null) break; // Presionar Ctrl + D
